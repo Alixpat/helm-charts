@@ -1,0 +1,27 @@
+apiVersion: v1
+entries:
+  meshcentral:
+  - apiVersion: v2
+    appVersion: 1.2.6
+    created: "2026-09-30T21:21:02.919421668Z"
+    description: MeshCentral derrière Traefik, avec compte admin, groupe d'agents
+      et script d'installation des agents automatiques
+    digest: f72ec3726bf3044d365b68da4a320ec65c4be7b53eed6b97d1becadbf95167c9
+    home: https://meshcentral.com
+    icon: https://raw.githubusercontent.com/Ylianst/MeshCentral/master/public/favicon.ico
+    keywords:
+    - meshcentral
+    - remote-management
+    - rmm
+    maintainers:
+    - name: Alixpat
+      url: https://github.com/Alixpat
+    name: meshcentral
+    sources:
+    - https://github.com/Ylianst/MeshCentral
+    - https://github.com/Alixpat/helm-charts
+    type: application
+    urls:
+    - https://github.com/Alixpat/helm-charts/releases/download/meshcentral-0.1.0/meshcentral-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-09-30T21:21:02.919435424Z"
