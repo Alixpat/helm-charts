@@ -1,0 +1,13 @@
+MeshCentral {{ .Values.image.tag }} : https://{{ .Values.hostname }}/
+
+Connexion :
+  Utilisateur  : {{ .Values.admin.username }}
+  Mot de passe : kubectl get secret -n {{ .Release.Namespace }} {{ include "meshcentral.fullname" . }}-admin -o jsonpath='{.data.password}' | base64 -d; echo
+
+Installer l'agent sur une VM (en root), avec étiquettes et description facultatives :
+  curl -fsSL https://{{ .Values.hostname }}/agent/install.sh | bash -s -- prod,web,zone-a "Serveur web"
+
+La VM apparaît dans le groupe "{{ .Values.agentGroup }}". Relancer la commande met à jour ses étiquettes.
+
+Sauvegardez le volume {{ include "meshcentral.fullname" . }}-data (certificats serveur) :
+sa perte rend tous les agents orphelins.

@@ -1,0 +1,137 @@
+{{- $volumes := list "data" "files" "backups" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meshcentral.fullname" . }}
+  labels:
+    {{- include "meshcentral.labels" . | nindent 4 }}
+spec:
+  # MeshCentral ne supporte pas plusieurs instances sur les mêmes données.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "meshcentral.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include "meshcentral.config" . | sha256sum }}
+        checksum/agent: {{ include (print $.Template.BasePath "/configmap-agent.yaml") . | sha256sum }}
+      labels:
+        {{- include "meshcentral.labels" . | nindent 8 }}
+    spec:
+      initContainers:
+        # Crée le compte admin s'il n'existe pas (sans effet sinon), MeshCentral étant arrêté.
+        - name: create-admin
+          image: {{ include "meshcentral.image" . }}
+          workingDir: /opt/meshcentral/meshcentral
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              node meshcentral --configfile "$CONFIG_FILE" --createaccount "$ADMIN_USERNAME" --pass "$ADMIN_PASSWORD"
+              node meshcentral --configfile "$CONFIG_FILE" --adminaccount "$ADMIN_USERNAME"
+              node meshcentral --configfile "$CONFIG_FILE" --logintokenkey > /bootstrap/loginkey.txt
+          env:
+            - name: CONFIG_FILE
+              value: /opt/meshcentral/config/config.json
+            - name: ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meshcentral.fullname" . }}-admin
+                  key: username
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meshcentral.fullname" . }}-admin
+                  key: password
+          volumeMounts:
+            - name: config
+              mountPath: /opt/meshcentral/config
+              readOnly: true
+            - name: bootstrap
+              mountPath: /bootstrap
+            {{- range $volumes }}
+            - name: {{ . }}
+              mountPath: /opt/meshcentral/meshcentral-{{ . }}
+            {{- end }}
+      containers:
+        - name: meshcentral
+          image: {{ include "meshcentral.image" . }}
+          env:
+            - name: CONFIG_FILE
+              value: /opt/meshcentral/config/config.json
+            - name: DYNAMIC_CONFIG
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 4430
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /opt/meshcentral/config
+              readOnly: true
+            - name: web
+              mountPath: /opt/meshcentral/meshcentral-web/public
+              readOnly: true
+            {{- range $volumes }}
+            - name: {{ . }}
+              mountPath: /opt/meshcentral/meshcentral-{{ . }}
+            {{- end }}
+        # Crée le groupe d'agents et publie le script d'installation.
+        - name: agent-bootstrap
+          image: {{ include "meshcentral.image" . }}
+          command: ["/bin/bash", "/scripts/bootstrap.sh"]
+          env:
+            - name: ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meshcentral.fullname" . }}-admin
+                  key: username
+            - name: AGENT_GROUP
+              value: {{ .Values.agentGroup | quote }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: bootstrap
+              mountPath: /bootstrap
+              readOnly: true
+            - name: web
+              mountPath: /web
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "meshcentral.fullname" . }}-agent
+        - name: bootstrap
+          emptyDir: {}
+        - name: web
+          emptyDir: {}
+        - name: config
+          secret:
+            secretName: {{ include "meshcentral.fullname" . }}-config
+            items:
+              - key: config.json
+                path: config.json
+        {{- range $volumes }}
+        - name: {{ . }}
+          persistentVolumeClaim:
+            claimName: {{ include "meshcentral.fullname" $ }}-{{ . }}
+        {{- end }}

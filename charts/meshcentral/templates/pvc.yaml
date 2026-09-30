@@ -1,0 +1,19 @@
+{{- range $name, $size := dict "data" .Values.persistence.dataSize "files" .Values.persistence.filesSize "backups" .Values.persistence.backupsSize }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "meshcentral.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "meshcentral.labels" $ | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with $.Values.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $size }}
+{{- end }}

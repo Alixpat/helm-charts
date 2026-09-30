@@ -1,0 +1,42 @@
+# -- (requis) Nom DNS public de MeshCentral, ex. mesh.example.com.
+# Inscrit dans les agents : le changer après coup impose de les réinstaller.
+hostname: ""
+
+image:
+  # -- Registry de l'image (votre registry interne en airgap).
+  registry: ghcr.io
+  repository: ylianst/meshcentral
+  tag: "1.2.6"
+
+# -- Compte administrateur créé au premier démarrage (sans effet s'il existe déjà).
+admin:
+  username: admin
+  # -- Vide = généré et conservé dans le Secret <release>-meshcentral-admin.
+  password: ""
+
+# -- Groupe dans lequel les agents s'inscrivent (créé automatiquement).
+agentGroup: Serveurs
+
+ui:
+  # -- Titre des pages (vide = « MeshCentral »).
+  title: ""
+
+ingress:
+  # -- IngressClass (vide = IngressClass par défaut du cluster).
+  className: ""
+  # -- Secret TLS existant, dans le namespace de la release (vide = certificat par défaut de Traefik).
+  tlsSecretName: ""
+
+persistence:
+  # -- StorageClass (vide = StorageClass par défaut du cluster).
+  storageClass: ""
+  # -- Certificats serveur et base de données. À sauvegarder impérativement.
+  dataSize: 2Gi
+  filesSize: 10Gi
+  backupsSize: 10Gi
+
+resources: {}
+
+# -- Surcharge libre du config.json (fusion profonde), clés en minuscules.
+# Référence : https://raw.githubusercontent.com/Ylianst/MeshCentral/master/meshcentral-config-schema.json
+config: {}

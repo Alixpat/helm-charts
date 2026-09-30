@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "meshcentral.fullname" . }}
+  labels:
+    {{- include "meshcentral.labels" . | nindent 4 }}
+  annotations:
+    # HTTPS uniquement, pas de routeur sur l'entrypoint HTTP.
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  tls:
+    - hosts:
+        - {{ .Values.hostname | quote }}
+      {{- with .Values.ingress.tlsSecretName }}
+      secretName: {{ . }}
+      {{- end }}
+  rules:
+    - host: {{ .Values.hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "meshcentral.fullname" . }}
+                port:
+                  name: http

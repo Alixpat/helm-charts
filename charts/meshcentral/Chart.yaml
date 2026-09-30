@@ -1,0 +1,18 @@
+apiVersion: v2
+name: meshcentral
+description: MeshCentral - serveur web open source de gestion et prise en main à distance
+type: application
+version: 0.1.0
+appVersion: "1.2.6"
+home: https://meshcentral.com
+icon: https://raw.githubusercontent.com/Ylianst/MeshCentral/master/public/favicon.ico
+sources:
+  - https://github.com/Ylianst/MeshCentral
+  - https://github.com/Alixpat/helm-charts
+keywords:
+  - meshcentral
+  - remote-management
+  - rmm
+maintainers:
+  - name: Alixpat
+    url: https://github.com/Alixpat

@@ -1,0 +1,6 @@
+*.tgz
+.cr-release-packages/
+.cr-index/
+charts/*/charts/
+.idea/
+.vscode/

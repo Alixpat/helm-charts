@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meshcentral.fullname" . }}-agent
+  labels:
+    {{- include "meshcentral.labels" . | nindent 4 }}
+data:
+  # Exécuté par le conteneur agent-bootstrap : crée le groupe s'il n'existe pas
+  # puis publie install.sh (servi sur https://<hostname>/agent/install.sh).
+  bootstrap.sh: |
+    #!/bin/bash
+    set -u
+    trap 'exit 0' TERM
+    cd /opt/meshcentral/meshcentral
+    ctrl() { node meshctrl.js --url ws://127.0.0.1:4430 --loginuser "$ADMIN_USERNAME" --loginkeyfile /bootstrap/loginkey.txt "$@"; }
+    groupid() { ctrl listdevicegroups --json 2>/dev/null | jq -r --arg n "$AGENT_GROUP" '[.[]? | select(.name == $n)][0]._id // empty' 2>/dev/null; }
+    # meshctrl renvoie 0 même en cas d'échec de connexion : on attend une réponse JSON valide.
+    until ctrl serverinfo --json 2>/dev/null | jq -e '.name' >/dev/null 2>&1; do sleep 5; done
+    id=$(groupid)
+    if [ -z "$id" ]; then
+      echo "Création du groupe \"$AGENT_GROUP\""
+      ctrl adddevicegroup --name "$AGENT_GROUP"
+      id=$(groupid)
+    fi
+    if [ -z "$id" ]; then echo "Impossible de créer le groupe \"$AGENT_GROUP\"" >&2; exit 1; fi
+    mkdir -p /web/agent
+    sed "s#__GROUP_ID__#${id#mesh//}#" /scripts/install.sh > /web/agent/install.sh.tmp
+    mv /web/agent/install.sh.tmp /web/agent/install.sh
+    echo "Script d'installation publié : https://{{ .Values.hostname }}/agent/install.sh (groupe \"$AGENT_GROUP\")"
+    sleep infinity & wait
+
+  install.sh: |
+    #!/bin/bash
+    # Installe l'agent MeshCentral et l'inscrit dans le groupe "{{ .Values.agentGroup }}".
+    # Usage : curl -fsSL https://{{ .Values.hostname }}/agent/install.sh | sudo bash -s -- [étiquettes] [description]
+    #   ex. : curl -fsSL https://{{ .Values.hostname }}/agent/install.sh | sudo bash -s -- prod,web,zone-a "Serveur web"
+    # Relancé sur une machine déjà équipée, il met seulement à jour les étiquettes et la description.
+    set -euo pipefail
+    SERVER="https://{{ .Values.hostname }}"
+    GROUP_ID='__GROUP_ID__'
+    TAGS="${1:-}"
+    DESC="${2:-}"
+    DIR=/usr/local/mesh_services/meshagent
+
+    if [ "$(id -u)" -ne 0 ]; then echo "Ce script doit être lancé en root." >&2; exit 1; fi
+
+    # Étiquettes et description, lues par l'agent à chaque connexion.
+    mkdir -p "$DIR"
+    : > "$DIR/meshagent.tag"
+    if [ -n "$TAGS" ]; then echo "~ServerTags:$TAGS" >> "$DIR/meshagent.tag"; fi
+    if [ -n "$DESC" ]; then echo "~ServerDesc:$DESC" >> "$DIR/meshagent.tag"; fi
+
+    if [ -x "$DIR/meshagent" ]; then
+      systemctl restart meshagent
+      echo "Agent déjà installé : étiquettes et description mises à jour."
+      exit 0
+    fi
+
+    TMP=$(mktemp -d)
+    trap 'rm -rf "$TMP"' EXIT
+    cd "$TMP"
+    wget -q -O meshinstall.sh "$SERVER/meshagents?script=1" 2>/dev/null || curl -fsSL -o meshinstall.sh "$SERVER/meshagents?script=1"
+    bash meshinstall.sh "$SERVER" "$GROUP_ID"
